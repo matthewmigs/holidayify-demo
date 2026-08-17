@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ember &amp; Wick — Holidayify demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #FAF7F2;
+    --ink: #2B2620;
+    --olive: #6B7A52;
+    --tan: #B08968;
+    --line: #E3DCCB;
+    --hf-accent: var(--olive);
+    --hf-accent-2: var(--tan);
+    --hf-bg-tint: transparent;
+    --hf-text-on-accent: #FAF7F2;
+    transition: --hf-accent 400ms;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    transition: background-color .5s ease, color .5s ease;
+  }
+
+  body.hf-tinted {
+    background: color-mix(in srgb, var(--hf-bg-tint) 10%, var(--paper));
+  }
+
+  h1, h2, .display {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  header.site {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 40px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .wordmark {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+  }
+
+  .wordmark em { font-style: italic; color: var(--hf-accent); transition: color .4s ease; }
+
+  nav.site a {
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 13px;
+    margin-left: 28px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.75;
+  }
+
+  .hero {
+    padding: 90px 40px 70px;
+    max-width: 760px;
+  }
+
+  .hero .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--hf-accent);
+    font-weight: 600;
+    transition: color .4s ease;
+  }
+
+  .hero h1 {
+    font-size: 56px;
+    line-height: 1.05;
+    margin: 14px 0 20px;
+  }
+
+  .hero p {
+    font-size: 17px;
+    line-height: 1.6;
+    max-width: 480px;
+    opacity: 0.8;
+  }
+
+  .cta {
+    display: inline-block;
+    margin-top: 28px;
+    padding: 13px 26px;
+    background: var(--hf-accent);
+    color: var(--hf-text-on-accent);
+    border-radius: 3px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    transition: background .4s ease, color .4s ease;
+  }
+
+  .products {
+    padding: 10px 40px 100px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    max-width: 1080px;
+  }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.4);
+  }
+
+  .card .swatch {
+    height: 160px;
+    background: linear-gradient(160deg, var(--hf-accent-2), var(--hf-accent));
+    transition: background .4s ease;
+  }
+
+  .card .info { padding: 16px 18px 20px; }
+  .card .info .name { font-family: 'Fraunces', serif; font-size: 16px; margin-bottom: 4px; }
+  .card .info .price { font-size: 13px; opacity: 0.65; }
+
+  /* ---- demo control dock (not part of the merchant-facing widget) ---- */
+  #demo-dock {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    background: #201C17;
+    border-radius: 999px;
+    padding: 8px;
+    display: flex;
+    gap: 6px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    z-index: 2147483600;
+  }
+  #demo-dock button {
+    border: none;
+    background: transparent;
+    color: #EDE8DD;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: background .2s ease, opacity .2s ease;
+    white-space: nowrap;
+  }
+  #demo-dock button:hover { opacity: 1; }
+  #demo-dock button.active { background: #EDE8DD; color: #201C17; opacity: 1; font-weight: 600; }
+
+  @media (max-width: 760px) {
+    .products { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 38px; }
+    header.site { padding: 18px 20px; }
+    .hero { padding: 60px 20px 50px; }
+    .products { padding: 10px 20px 120px; }
+    #demo-dock { flex-wrap: wrap; justify-content: center; width: 92%; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="site">
+    <div class="wordmark">Ember &amp; <em>Wick</em></div>
+    <nav class="site">
+      <a href="#">Shop</a>
+      <a href="#">Scents</a>
+      <a href="#">About</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow">Hand-poured, small batch</div>
+    <h1>Candles made for<br/>slow evenings.</h1>
+    <p>Every candle is poured in small batches with coconut wax and cotton wicks — clean burning, true to scent, made to last.</p>
+    <a href="#" class="cta">Shop the collection</a>
+  </section>
+
+  <section class="products">
+    <div class="card">
+      <div class="swatch"></div>
+      <div class="info">
+        <div class="name">Fig &amp; Cedar</div>
+        <div class="price">$28.00</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="swatch"></div>
+      <div class="info">
+        <div class="name">Amber Oak</div>
+        <div class="price">$28.00</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="swatch"></div>
+      <div class="info">
+        <div class="name">Salt Air</div>
+        <div class="price">$28.00</div>
+      </div>
+    </div>
+  </section>
+
+  <div id="demo-dock"></div>
+
+  <!-- ============================================================= -->
+  <!-- Holidayify engine (inlined here for the demo; in production   -->
+  <!-- this is a single external <script src="holidayify.js"> tag)  -->
+  <!-- ============================================================= -->
+  <script>
+  (function (window, document) {
+    "use strict";
+    const PACKS = {
+      halloween: { label: "Halloween", vars: { "--hf-accent": "#FF7A1A", "--hf-accent-2": "#3D1C56", "--hf-bg-tint": "#1B1023", "--hf-text-on-accent": "#0E0712" }, bannerText: "🎃 Spooky season savings — through October 31st", decoration: "bats" },
+      christmas: { label: "Christmas", vars: { "--hf-accent": "#B3182B", "--hf-accent-2": "#1C4A34", "--hf-bg-tint": "#0E2B1F", "--hf-text-on-accent": "#FBF6EC" }, bannerText: "🎄 Holiday shipping cutoffs are near — order soon", decoration: "snow" },
+      bfcm: { label: "Black Friday / Cyber Monday", vars: { "--hf-accent": "#F5C400", "--hf-accent-2": "#0A0A0A", "--hf-bg-tint": "#000000", "--hf-text-on-accent": "#0A0A0A" }, bannerText: "⚡ Black Friday deals — biggest sale of the year", decoration: "confetti" },
+      valentines: { label: "Valentine's Day", vars: { "--hf-accent": "#D6336C", "--hf-accent-2": "#F7C6D9", "--hf-bg-tint": "#3A0D1E", "--hf-text-on-accent": "#FFF5F8" }, bannerText: "💌 Valentine's gifts, picked with love", decoration: "hearts" }
+    };
+
+    function applyVars(vars) { const root = document.documentElement; Object.keys(vars).forEach(k => root.style.setProperty(k, vars[k])); }
+    function clearVars(vars) { const root = document.documentElement; Object.keys(vars).forEach(k => root.style.removeProperty(k)); }
+
+    function injectBanner(pack) {
+      removeBanner();
+      const bar = document.createElement("div");
+      bar.id = "hf-banner";
+      bar.textContent = pack.bannerText;
+      bar.setAttribute("style", "position:relative;width:100%;box-sizing:border-box;padding:10px 16px;text-align:center;font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600;letter-spacing:.01em;background:var(--hf-accent);color:var(--hf-text-on-accent);z-index:2147483000;");
+      document.body.prepend(bar);
+    }
+    function removeBanner() { const el = document.getElementById("hf-banner"); if (el) el.remove(); }
+
+    function injectCredit() {
+      removeCredit();
+      const badge = document.createElement("a");
+      badge.id = "hf-credit";
+      badge.href = "https://holidayify.app";
+      badge.target = "_blank";
+      badge.rel = "noopener";
+      badge.textContent = "Themed by Holidayify";
+      badge.setAttribute("style", "position:fixed;bottom:10px;right:10px;background:rgba(0,0,0,.65);color:#fff;font-family:system-ui,-apple-system,sans-serif;font-size:11px;padding:5px 9px;border-radius:999px;text-decoration:none;z-index:2147483000;opacity:.85;");
+      document.body.appendChild(badge);
+    }
+    function removeCredit() { const el = document.getElementById("hf-credit"); if (el) el.remove(); }
+
+    let decorationFrame = null, decorationCanvas = null;
+
+    function injectDecoration(type) {
+      removeDecoration();
+      const canvas = document.createElement("canvas");
+      canvas.id = "hf-decoration";
+      canvas.setAttribute("style", "position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:2147482900;");
+      document.body.appendChild(canvas);
+      decorationCanvas = canvas;
+      const ctx = canvas.getContext("2d");
+      function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+      resize();
+      window.addEventListener("resize", resize);
+      const particles = makeParticles(type, canvas.width, canvas.height);
+      function tick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(canvas.width, canvas.height); p.draw(ctx); });
+        decorationFrame = requestAnimationFrame(tick);
+      }
+      tick();
+    }
+    function removeDecoration() {
+      if (decorationFrame) cancelAnimationFrame(decorationFrame);
+      if (decorationCanvas) decorationCanvas.remove();
+      decorationFrame = null; decorationCanvas = null;
+    }
+    function makeParticles(type, w, h) {
+      const items = [];
+      for (let i = 0; i < 60; i++) items.push(makeParticle(type, w, h));
+      return items;
+    }
+    function makeParticle(type, w, h) {
+      const base = { x: Math.random()*w, y: Math.random()*h, speed: 0.5+Math.random()*1.5, drift: (Math.random()-0.5)*0.6, size: 8+Math.random()*10, rot: Math.random()*Math.PI*2, spin: (Math.random()-0.5)*0.02 };
+      return Object.assign(base, {
+        update(w, h) { this.y += this.speed; this.x += this.drift; this.rot += this.spin; if (this.y > h+20) { this.y = -20; this.x = Math.random()*w; } },
+        draw(ctx) {
+          ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rot); ctx.globalAlpha = 0.85;
+          if (type === "snow") { ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0,0,this.size/4,0,Math.PI*2); ctx.fill(); }
+          else if (type === "confetti") { ctx.fillStyle = ["#F5C400","#ffffff","#F5C400"][Math.floor(this.x)%3]; ctx.fillRect(-this.size/2,-this.size/4,this.size,this.size/2); }
+          else if (type === "hearts") { ctx.fillStyle = "#F7C6D9"; drawHeart(ctx, this.size/2); }
+          else if (type === "bats") { ctx.fillStyle = "#0E0712"; drawBat(ctx, this.size); }
+          ctx.restore();
+        }
+      });
+    }
+    function drawHeart(ctx, s) {
+      ctx.beginPath(); ctx.moveTo(0, s*0.3);
+      ctx.bezierCurveTo(0,0,-s,0,-s,s*0.3); ctx.bezierCurveTo(-s,s*0.7,0,s,0,s*1.3);
+      ctx.bezierCurveTo(0,s,s,s*0.7,s,s*0.3); ctx.bezierCurveTo(s,0,0,0,0,s*0.3); ctx.fill();
+    }
+    function drawBat(ctx, s) {
+      ctx.beginPath(); ctx.moveTo(0,0);
+      ctx.quadraticCurveTo(-s,-s*0.6,-s*1.4,0); ctx.quadraticCurveTo(-s*0.6,-s*0.2,0,0.2);
+      ctx.quadraticCurveTo(s*0.6,-s*0.2,s*1.4,0); ctx.quadraticCurveTo(s,-s*0.6,0,0); ctx.fill();
+    }
+
+    let currentPackKey = null;
+
+    function init(options) {
+      const opts = Object.assign({ theme: null, banner: true, decorations: true, credit: true }, options || {});
+      const key = opts.theme;
+      document.body.classList.toggle("hf-tinted", !!key);
+      if (!key || !PACKS[key]) { teardown(); return { active: false, theme: null }; }
+      const pack = PACKS[key];
+      currentPackKey = key;
+      applyVars(pack.vars);
+      if (opts.banner) injectBanner(pack); else removeBanner();
+      if (opts.decorations) injectDecoration(pack.decoration); else removeDecoration();
+      if (opts.credit) injectCredit(); else removeCredit();
+      return { active: true, theme: key, label: pack.label };
+    }
+    function teardown() {
+      if (currentPackKey) clearVars(PACKS[currentPackKey].vars);
+      removeBanner(); removeDecoration(); removeCredit();
+      currentPackKey = null;
+      document.body.classList.remove("hf-tinted");
+    }
+
+    window.Holidayify = { init, teardown, packs: PACKS };
+  })(window, document);
+  </script>
+
+  <!-- ============================================================= -->
+  <!-- Demo control dock — lets you click through holidays for a gif -->
+  <!-- ============================================================= -->
+  <script>
+    const dock = document.getElementById("demo-dock");
+    const options = [
+      { key: null, label: "Everyday" },
+      { key: "halloween", label: "🎃 Halloween" },
+      { key: "christmas", label: "🎄 Christmas" },
+      { key: "bfcm", label: "⚡ BFCM" },
+      { key: "valentines", label: "💌 Valentine's" },
+    ];
+    let buttons = [];
+    options.forEach((opt, i) => {
+      const btn = document.createElement("button");
+      btn.textContent = opt.label;
+      btn.addEventListener("click", () => {
+        Holidayify.init({ theme: opt.key });
+        buttons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+      });
+      dock.appendChild(btn);
+      buttons.push(btn);
+    });
+    buttons[0].classList.add("active"); // start on "Everyday"
+  </script>
+
+</body>
+</html>
