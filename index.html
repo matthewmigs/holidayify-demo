@@ -122,6 +122,30 @@
   .card .info .name { font-family: 'Fraunces', serif; font-size: 16px; margin-bottom: 4px; }
   .card .info .price { font-size: 13px; opacity: 0.65; }
 
+  .pdp {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    padding: 0 40px 140px;
+    max-width: 1080px;
+    align-items: start;
+  }
+  .pdp__media { aspect-ratio: 4 / 5; background: linear-gradient(160deg, var(--tan), var(--olive)); border-radius: 4px; }
+  .pdp__info h2 { font-size: 32px; margin: 10px 0 6px; }
+  .pdp__price { font-size: 18px; }
+  .pdp__add { width: 100%; margin-top: 8px; padding: 14px; border: none; border-radius: 3px; background: var(--olive); color: var(--paper); font: 600 14px 'Inter', sans-serif; cursor: pointer; }
+  .pdp__note { font-size: 13px; opacity: .6; line-height: 1.5; margin-top: 14px; }
+
+  /* Holiday offer block: same CSS as extensions/holidayify-embed/blocks/offer.liquid */
+  .hf-offer { margin: 10px 0; }
+  .hf-offer .hf-offer__box { border-left: 3px solid currentColor; padding: 8px 12px; border-radius: 4px; background: rgba(127, 127, 127, .08); line-height: 1.45; text-align: left; }
+  .hf-offer .hf-offer__text { font-weight: 600; }
+  .hf-offer .hf-offer__row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 2px; font-size: .92em; }
+  .hf-offer .hf-offer__code, .hf-offer .hf-offer__applied { font-weight: 600; }
+  .hf-offer .hf-offer__btn { display: inline-block; margin: 0; padding: 1px 10px; border: 1px solid currentColor; border-radius: 999px; background: none; color: inherit; font: inherit; line-height: 1.45; text-decoration: none; cursor: pointer; }
+  .hf-offer .hf-offer__copy { border-style: dashed; }
+  .hf-offer .hf-offer__deadline { margin-top: 2px; font-size: .92em; opacity: .85; }
+
   /* ---- demo controls (not part of the merchant-facing app) ---- */
   #demo-dock {
     position: fixed;
@@ -210,6 +234,8 @@
 
   @media (max-width: 760px) {
     .products { grid-template-columns: 1fr; }
+    .pdp { grid-template-columns: 1fr; gap: 20px; padding: 0 20px 170px; }
+    .pdp__media { aspect-ratio: 16 / 9; }
     .hero h1 { font-size: 38px; }
     header.site { padding: 18px 20px; }
     .hero { padding: 60px 20px 50px; }
@@ -266,6 +292,19 @@
         <div class="name">Salt Air</div>
         <div class="price">$28.00</div>
       </div>
+    </div>
+  </section>
+
+  <!-- A product page, with the Holiday offer app block (Growth plan) under the price. -->
+  <section class="pdp">
+    <div class="pdp__media"></div>
+    <div class="pdp__info">
+      <div class="eyebrow">Product page</div>
+      <h2>Fig &amp; Cedar candle</h2>
+      <div class="pdp__price">$28.00</div>
+      <div id="offer-slot"></div>
+      <button type="button" class="pdp__add">Add to cart</button>
+      <p class="pdp__note">Shoppers from ads and emails often land here, not on the homepage. The Holiday offer block shows the holiday's code and countdown right under the price.</p>
     </div>
   </section>
 
@@ -333,10 +372,54 @@
     ];
     const DEFAULT = "bfcm";
 
+    // What the Holiday offer block's Liquid renders on a store (see
+    // blocks/offer.liquid): the offer is in the page before the engine runs,
+    // which then adds Copy and the live countdown. Holidays with no code or
+    // deadline (Halloween here) get no block.
+    const ACCENTS = { bfcm: "#F5C400", christmas: "#B3182B", valentines: "#D6336C", halloween: "#FF7A1A" };
+    function countdown(until, deadline) {
+      const mins = Math.floor((Date.parse(until) - Date.now()) / 60000);
+      if (mins <= 0) return null;
+      const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+      const cd = d > 0 ? d + "d " + h + "h" : h > 0 ? h + "h " + m + "m" : m > 0 ? m + "m" : "<1m";
+      return deadline ? deadline + " · " + cd + " left" : "Ends in " + cd;
+    }
+    function renderOfferBlock(key) {
+      const slot = document.getElementById("offer-slot");
+      slot.textContent = "";
+      const cta = key && ctas[key];
+      if (!cta || !(cta.code || cta.deadline || cta.countdownTo)) return;
+      const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
+      const block = el("div", "hf-offer");
+      block.setAttribute("data-holidayify-offer", "");
+      block.setAttribute("data-pack", key);
+      block.setAttribute("data-code", cta.code || "");
+      block.setAttribute("data-mode", cta.codeMode);
+      block.setAttribute("data-deadline", cta.deadline || "");
+      block.setAttribute("data-until", cta.countdownTo ? String(Math.floor(Date.parse(cta.countdownTo) / 1000)) : "");
+      block.setAttribute("data-countdown", "true");
+      const box = el("div", "hf-offer__box");
+      box.style.borderLeftColor = ACCENTS[key];
+      box.append(el("div", "hf-offer__text", customBanners[key]));
+      if (cta.code) {
+        const row = el("div", "hf-offer__row");
+        row.append(el("span", "hf-offer__code", "Code " + cta.code));
+        const copy = el("button", "hf-offer__btn hf-offer__copy", "Copy");
+        copy.type = "button";
+        row.append(copy);
+        box.append(row);
+      }
+      const line = cta.countdownTo ? countdown(cta.countdownTo, cta.deadline) : cta.deadline;
+      if (line) box.append(el("div", "hf-offer__deadline", line));
+      block.append(box);
+      slot.append(block);
+    }
+
     function show(key) {
+      renderOfferBlock(key);
       Holidayify.init(Object.assign(
         key ? forceOn(key) : { activePacks: [] },
-        { customBanners, ctas, tracking: null, banner: true, decorations: true, credit: true, keepDecorations: false }
+        { customBanners, ctas, tracking: null, offer: true, banner: true, decorations: true, credit: true, keepDecorations: false }
       ));
       current = key;
     }

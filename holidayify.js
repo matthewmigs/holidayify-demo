@@ -667,6 +667,124 @@
     return Promise.race([promise.catch(() => {}), new Promise((resolve) => setTimeout(resolve, ms))]);
   }
 
+  // --- Holiday offer block (theme app block, Growth plan and up) ---
+  // The block's Liquid renders the active holiday's offer on the server
+  // (text, code, Copy or Apply, deadline/countdown), so it's in the page from
+  // the start. Here it comes alive: Copy, Apply (with the consent-checked
+  // cart marker), "will be applied" when the code is already on the cart, and
+  // a live countdown. If this script disagrees about which holiday is on
+  // (e.g. a visitor in another timezone at the very edge of a window), the
+  // box is hidden.
+  let offerArgs = null, offerTimer = null, offerUpdates = [], offerObserver = null;
+
+  function renderOffers(key, opts) {
+    offerArgs = [key, opts];
+    if (offerTimer) clearInterval(offerTimer);
+    offerTimer = null;
+    offerUpdates = [];
+    fillOffers(document.querySelectorAll("[data-holidayify-offer]"));
+    watchOfferBoxes();
+  }
+
+  function fillOffers(boxes) {
+    if (!boxes.length || !offerArgs) return;
+    const [key, opts] = offerArgs;
+    const updates = [];
+    boxes.forEach((box) => {
+      box.setAttribute("data-hf-filled", "");
+      const pack = box.getAttribute("data-pack");
+      if (!pack) return; // theme editor placeholder
+      if (opts.offer !== true || pack !== key) { collapseOffer(box); return; }
+      const update = hydrateOffer(box);
+      if (update) updates.push(update);
+    });
+    if (updates.length) {
+      offerUpdates = offerUpdates.concat(updates);
+      if (!offerTimer) offerTimer = setInterval(() => offerUpdates.forEach((u) => u()), 30 * 1000);
+    }
+  }
+
+  function collapseOffer(box) {
+    box.textContent = "";
+    box.hidden = true;
+  }
+
+  // Returns a function that refreshes the countdown, or null if there's none.
+  function hydrateOffer(box) {
+    const code = box.getAttribute("data-code") || "";
+    const copy = box.querySelector(".hf-offer__copy");
+    if (copy && code) {
+      copy.addEventListener("click", () => {
+        onOfferClick();
+        copyText(code).then(
+          () => { copy.textContent = "Copied ✓"; setTimeout(() => { copy.textContent = "Copy"; }, 2500); },
+          () => { copy.remove(); }
+        );
+      });
+    }
+    const apply = box.querySelector(".hf-offer__apply");
+    if (apply && code) {
+      apply.addEventListener("click", (e) => {
+        const marking = onOfferClick();
+        if (!marking || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        within(marking, MARKER_WAIT_MS).then(() => { window.location.href = apply.href; });
+      });
+      // Already on the cart (e.g. from the banner): say so instead.
+      cartHasCode(code).then((yes) => {
+        const applied = box.querySelector(".hf-offer__applied");
+        if (!yes || !applied) return;
+        apply.remove();
+        applied.hidden = false;
+      });
+    }
+
+    const until = Number(box.getAttribute("data-until"));
+    if (box.getAttribute("data-countdown") === "false" || !until) return null;
+    const countdownTo = new Date(until * 1000).toISOString();
+    const deadline = box.getAttribute("data-deadline") || null;
+    return () => {
+      const line = box.querySelector(".hf-offer__deadline");
+      if (!line) return;
+      const t = deadlineLine(deadline, countdownTo, false);
+      if (t) line.textContent = t; else line.remove();
+    };
+  }
+
+  // An offer click counts as a click from the product page and, with the
+  // shopper's consent, marks the cart like a banner click does.
+  function onOfferClick() {
+    sendEvent("offer");
+    if (!tracking || !tracking.marker) return null;
+    return markCart(window, tracking.campaign);
+  }
+
+  function cartHasCode(code) {
+    const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
+    return fetch(root + "cart.js", { headers: { Accept: "application/json" } })
+      .then((r) => r.json())
+      // An empty cart reports codes as not applicable yet; with items, only
+      // say it applies if Shopify says so (e.g. not for excluded products).
+      .then((c) => (c.discount_codes || []).some((d) => (d.applicable || c.item_count === 0) && String(d.code).toUpperCase() === code.toUpperCase()))
+      .catch(() => false);
+  }
+
+  // Boxes added after the page loaded (quick view, product recommendations
+  // loaded by the theme) get filled too.
+  function watchOfferBoxes() {
+    if (offerObserver || !window.MutationObserver) return;
+    let queued = false;
+    offerObserver = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      setTimeout(() => {
+        queued = false;
+        fillOffers(document.querySelectorAll("[data-holidayify-offer]:not([data-hf-filled])"));
+      }, 100);
+    });
+    offerObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
   let currentPackKey = null;
   let pollTimer = null;
 
@@ -678,6 +796,7 @@
     if (!key) {
       tracking = null;
       removeBanner(); removeDecoration(); removeCredit();
+      renderOffers(null, opts);
       return;
     }
     const pack = PACKS[key];
@@ -693,6 +812,7 @@
       injectBanner(typeof custom === "string" && custom.trim() ? custom : pack.bannerText, pack, cta || null);
       sendEvent("view");
     } else removeBanner();
+    renderOffers(key, opts);
     if (opts.decorations !== false) injectDecoration(pack.decoration, opts.keepDecorations === true); else removeDecoration();
     if (opts.credit !== false) injectCredit(); else removeCredit();
   }
