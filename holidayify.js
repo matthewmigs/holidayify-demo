@@ -603,7 +603,7 @@
   // `tracking` = { campaign, marker } for the holiday on screen, else null.
   // Views and clicks are sent as anonymous counts: no cookies, no storage,
   // no visitor ID. The _holidayify cart marker (lets the app credit an order
-  // to a banner click) is set only when the shopper has consented to
+  // to a banner click) is set only where the shopper's privacy choices allow
   // analytics (Shopify's Customer Privacy API).
   let tracking = null;
   const MARKER_WAIT_MS = 800;
@@ -625,11 +625,12 @@
     return markCart(window, tracking.campaign);
   }
 
-  // True only if the shopper has explicitly said yes to analytics in the
-  // store's cookie banner (Shopify's Customer Privacy API) and nothing
-  // overrides it. analyticsProcessingAllowed() alone isn't enough: it is also
-  // true when the shopper made no choice in a region that doesn't require
-  // one. No API, an error or a failed load all count as no.
+  // True when the shopper's privacy choices allow analytics, as Shopify's
+  // Customer Privacy API reports them: analyticsProcessingAllowed() is true
+  // after an explicit yes and in regions where consent isn't required. Never
+  // when the shopper declined analytics or opted out of the sale of their
+  // data, or the browser sends Global Privacy Control. No API, an error or a
+  // failed load all count as no.
   function analyticsAllowed(win) {
     return new Promise((resolve) => {
       const S = win.Shopify;
@@ -637,7 +638,9 @@
         try {
           const cp = S.customerPrivacy;
           const consent = typeof cp.currentVisitorConsent === "function" ? cp.currentVisitorConsent() : null;
-          resolve(!!consent && consent.analytics === "yes" && cp.analyticsProcessingAllowed() === true);
+          const declined = !!consent && (consent.analytics === "no" || consent.sale_of_data === "no");
+          const gpc = !!(win.navigator && win.navigator.globalPrivacyControl === true);
+          resolve(cp.analyticsProcessingAllowed() === true && !declined && !gpc);
         } catch (e) { resolve(false); }
       };
       if (S && S.customerPrivacy) return check();
@@ -649,7 +652,7 @@
   }
 
   // Puts the campaign (e.g. "halloween-2026") on the cart as a hidden
-  // attribute, only with consent. Resolves true if it was set.
+  // attribute, only where analytics is allowed. Resolves true if it was set.
   function markCart(win, campaign) {
     return analyticsAllowed(win).then((ok) => {
       if (!ok) return false;
